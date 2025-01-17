@@ -30,7 +30,6 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
-import jakarta.persistence.Transient;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -593,7 +592,11 @@ public class Dataverse extends DvObjectContainer {
     }
 
     public void setMetadataBlocks(List<MetadataBlock> metadataBlocks) {
-        this.metadataBlocks = metadataBlocks;
+        this.metadataBlocks = new ArrayList<>(metadataBlocks);
+    }
+
+    public void clearMetadataBlocks() {
+        this.metadataBlocks.clear();
     }
 
     public List<DatasetFieldType> getCitationDatasetFieldTypes() {
@@ -603,7 +606,25 @@ public class Dataverse extends DvObjectContainer {
     public void setCitationDatasetFieldTypes(List<DatasetFieldType> citationDatasetFieldTypes) {
         this.citationDatasetFieldTypes = citationDatasetFieldTypes;
     }
-    
+
+    @Column(nullable = true)
+    private Boolean requireFilesToPublishDataset;
+    /**
+     * Specifies whether the existance of files in a dataset is required when publishing
+     * @return {@code Boolean.TRUE} if explicitly enabled, {@code Boolean.FALSE} if explicitly disabled.
+     * {@code null} indicates that the behavior is not explicitly defined, in which
+     * case the behavior should follow the explicit configuration of the first
+     * direct ancestor collection.
+     * @Note: If present, this configuration therefore by default applies to all
+     * the sub-collections, unless explicitly overwritten there.
+     */
+    public Boolean getRequireFilesToPublishDataset() {
+        return requireFilesToPublishDataset;
+    }
+    public void setRequireFilesToPublishDataset(boolean requireFilesToPublishDataset) {
+        this.requireFilesToPublishDataset = requireFilesToPublishDataset;
+    }
+
     /**
      * @Note: this setting is Nullable, with {@code null} indicating that the 
      * desired behavior is not explicitly configured for this specific collection. 
@@ -774,6 +795,17 @@ public class Dataverse extends DvObjectContainer {
         return owners;
     }
 
+    public boolean getEffectiveRequiresFilesToPublishDataset() {
+        Dataverse dv = this;
+        while (dv != null) {
+            if (dv.getRequireFilesToPublishDataset() != null) {
+                return dv.getRequireFilesToPublishDataset();
+            }
+            dv = dv.getOwner();
+        }
+        return false;
+    }
+
     @Override
     public boolean equals(Object object) {
         // TODO: Warning - this method won't work in the case the id fields are not set
@@ -833,5 +865,18 @@ public class Dataverse extends DvObjectContainer {
     
     public String getLocalURL() {
         return  SystemConfig.getDataverseSiteUrlStatic() + "/dataverse/" + this.getAlias();
+    }
+
+    public void addInputLevelsMetadataBlocksIfNotPresent(List<DataverseFieldTypeInputLevel> inputLevels) {
+        for (DataverseFieldTypeInputLevel inputLevel : inputLevels) {
+            MetadataBlock inputLevelMetadataBlock = inputLevel.getDatasetFieldType().getMetadataBlock();
+            if (!hasMetadataBlock(inputLevelMetadataBlock)) {
+                metadataBlocks.add(inputLevelMetadataBlock);
+            }
+        }
+    }
+
+    private boolean hasMetadataBlock(MetadataBlock metadataBlock) {
+        return metadataBlocks.stream().anyMatch(block -> block.getId().equals(metadataBlock.getId()));
     }
 }

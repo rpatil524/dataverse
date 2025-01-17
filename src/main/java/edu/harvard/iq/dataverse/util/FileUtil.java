@@ -525,15 +525,18 @@ public class FileUtil implements java.io.Serializable  {
             // Check for shapefile extensions as described here: http://en.wikipedia.org/wiki/Shapefile
             //logger.info("Checking for shapefile");
 
-            ShapefileHandler shp_handler = new ShapefileHandler(new FileInputStream(f));
+            ShapefileHandler shp_handler = new ShapefileHandler(f);
              if (shp_handler.containsShapefile()){
               //  logger.info("------- shapefile FOUND ----------");
                  fileType = ShapefileHandler.SHAPEFILE_FILE_TYPE; //"application/zipped-shapefile";
              }
-
-            Optional<BagItFileHandler> bagItFileHandler = CDI.current().select(BagItFileHandlerFactory.class).get().getBagItFileHandler();
-             if(bagItFileHandler.isPresent() && bagItFileHandler.get().isBagItPackage(fileName, f)) {
-                 fileType = BagItFileHandler.FILE_TYPE;
+             try {
+                 Optional<BagItFileHandler> bagItFileHandler = CDI.current().select(BagItFileHandlerFactory.class).get().getBagItFileHandler();
+                 if (bagItFileHandler.isPresent() && bagItFileHandler.get().isBagItPackage(fileName, f)) {
+                     fileType = BagItFileHandler.FILE_TYPE;
+                 }
+             } catch (Exception e) {
+                 logger.warning("Error checking for BagIt package: " + e.getMessage());
              }
         } 
         
@@ -1816,5 +1819,13 @@ public class FileUtil implements java.io.Serializable  {
         String storageIdentifier = dataFile.getStorageIdentifier();
         return storageIdentifier.substring(0, storageIdentifier.indexOf(DataAccess.SEPARATOR));
     }
-    
+
+    /**
+     * Replace spaces with "_" and remove invalid chars
+     * @param fileNameIn - Name before sanitization NOTE: not full path since this method removes '/' and '\'
+     * @return filename without spaces or invalid chars
+     */
+    public static String sanitizeFileName(String fileNameIn) {
+        return fileNameIn == null ? null : fileNameIn.replace(' ', '_').replaceAll("[\\\\/:*?\"<>|,;]", "");
+    }
 }
